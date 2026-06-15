@@ -1,0 +1,24 @@
+# Secrets & personal data
+cookies.json
+
+# Local dev pages / saved HTML snapshots
+page_example/
+
+# Claude Code config
+.claude/
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dev artifacts
+*.log
