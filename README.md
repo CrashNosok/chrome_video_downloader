@@ -1,6 +1,6 @@
-# Kinescope Video Downloader
+# Kinescope + Telegram Video Downloader
 
-> A Chrome extension that extracts video, audio, and subtitle URLs from [Kinescope](https://kinescope.io) player embeds — so you can download your own content with `yt-dlp`.
+> A Chrome extension that (1) extracts video, audio, and subtitle URLs from [Kinescope](https://kinescope.io) player embeds for use with `yt-dlp`, and (2) downloads videos directly from [Telegram Web (WebK)](https://web.telegram.org/k/) with a one-click on-page button.
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue?logo=googlechrome)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green)
@@ -17,6 +17,24 @@ When you visit a page with a Kinescope video embed, this extension detects it, f
 - **Subtitle download buttons** for every available language (`.vtt` files)
 
 Works on pages with multiple embeds — each video gets its own card in the popup.
+
+On **Telegram Web (WebK)**, it adds a separate **⬇ Download video** button while a video is open in the player, and saves the file straight to disk.
+
+---
+
+## Telegram Web (WebK)
+
+Telegram streams video through a service worker that serves the file as `stream/{...}` URLs in 1 MiB `206` range chunks — there is no plain blob to grab, and the browser's own "Save Video As" is often unavailable (e.g. content-protected channels).
+
+This extension injects `telegram.js` into `web.telegram.org` in the **MAIN world** (same context as the page, so its `fetch` goes through Telegram's service worker). While a video is open in the player it shows a fixed **⬇ Download video** button (top-right) that:
+
+1. Reads the playing `video.ckin__video` element's stream URL
+2. Re-fetches the whole file sequentially via `Range: bytes=<pos>-` requests and assembles a `Blob`
+3. Saves it with the original filename embedded in the stream URL
+
+**Quality** follows whatever variant is selected in Telegram's own ⚙ player menu — set it there before downloading. The full file is assembled in memory, so very large videos (multi-GB) may exceed available RAM.
+
+Requires Chrome 111+ (for MAIN-world content scripts).
 
 ---
 
@@ -168,6 +186,8 @@ kinescope-video-downloader/
 ├── manifest.json          # Extension manifest (v3)
 ├── service-worker.js      # Background: fetches embed pages, extracts playerOptions
 ├── content-script.js      # Injected into every tab: scans for Kinescope iframes
+├── telegram.js            # MAIN-world script for web.telegram.org: download button + chunked fetch
+├── test_telegram.js       # Test: verifies the chunked range-assembly loop
 ├── popup/
 │   ├── popup.html         # Extension popup markup
 │   ├── popup.js           # Popup logic: renders videos, handles user interactions
@@ -196,10 +216,11 @@ kinescope-video-downloader/
 
 ## Limitations
 
-- **Kinescope only.** This extension specifically targets `kinescope.io` embeds. It will not work with Vimeo, YouTube, or other video platforms.
+- **Two platforms only.** The popup targets `kinescope.io` embeds; the download button targets `web.telegram.org` (WebK, the `/k/` client). Other platforms are not supported.
 - **No DRM.** Videos protected with DRM cannot be downloaded.
-- **Requires page access.** The content script runs when you open the popup; if the embed is inside a deeply nested cross-origin frame, detection may not work.
-- **HLS streams only.** The extension extracts HLS (`.m3u8`) URLs. `yt-dlp` handles reassembly into a standard video file.
+- **Kinescope: requires page access.** The content script runs when you open the popup; if the embed is inside a deeply nested cross-origin frame, detection may not work. The popup only works on Kinescope pages — opening it elsewhere shows a harmless "Receiving end does not exist" error.
+- **Kinescope: HLS streams only.** The extension extracts HLS (`.m3u8`) URLs. `yt-dlp` handles reassembly into a standard video file.
+- **Telegram: quality is whatever the player has selected**, and the whole file is buffered in memory before saving (heavy for multi-GB videos).
 
 ---
 
