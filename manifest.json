@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Kinescope + Telegram Video Downloader",
-  "version": "1.1.0",
-  "description": "Download videos from Kinescope embeds and Telegram Web (WebK)",
+  "name": "Kinescope + Telegram + Instagram Video Downloader",
+  "version": "1.2.0",
+  "description": "Download videos from Kinescope embeds, Telegram Web (WebK), and Instagram (reels/posts)",
   "permissions": [
     "activeTab",
     "downloads"
   ],
   "host_permissions": [
     "https://kinescope.io/*",
-    "https://web.telegram.org/*"
+    "https://web.telegram.org/*",
+    "https://www.instagram.com/*"
   ],
   "background": {
     "service_worker": "service-worker.js"
@@ -25,6 +26,12 @@
       "js": ["telegram.js"],
       "world": "MAIN",
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.instagram.com/*"],
+      "js": ["instagram.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
     }
   ],
   "action": {

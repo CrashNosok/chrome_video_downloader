@@ -1,6 +1,6 @@
-# Kinescope + Telegram Video Downloader
+# Kinescope + Telegram + Instagram Video Downloader
 
-> A Chrome extension that (1) extracts video, audio, and subtitle URLs from [Kinescope](https://kinescope.io) player embeds for use with `yt-dlp`, and (2) downloads videos directly from [Telegram Web (WebK)](https://web.telegram.org/k/) with a one-click on-page button.
+> A Chrome extension that (1) extracts video, audio, and subtitle URLs from [Kinescope](https://kinescope.io) player embeds for use with `yt-dlp`, (2) downloads videos directly from [Telegram Web (WebK)](https://web.telegram.org/k/) with a one-click on-page button, and (3) downloads [Instagram](https://www.instagram.com) reels and video posts the same way.
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue?logo=googlechrome)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green)
@@ -18,7 +18,21 @@ When you visit a page with a Kinescope video embed, this extension detects it, f
 
 Works on pages with multiple embeds — each video gets its own card in the popup.
 
-On **Telegram Web (WebK)**, it adds a separate **⬇ Download video** button while a video is open in the player, and saves the file straight to disk.
+On **Telegram Web (WebK)** and **Instagram**, it adds a separate **⬇ Download video** button while a video is open, and saves the file straight to disk.
+
+---
+
+## Instagram
+
+Instagram plays reels via MSE, so the `<video>` element only has a `blob:` URL — there's nothing to grab from it directly. But every reel's **progressive MP4 URL** ships inside the page's own JSON: the server-rendered `<script type="application/json">` blobs on first load, and the GraphQL `fetch` responses while you scroll the feed.
+
+This extension injects `instagram.js` into `www.instagram.com` in the **MAIN world**. It:
+
+1. Wraps `window.fetch` (installed at `document_start`) and parses the SSR JSON, harvesting a `shortcode → MP4 URL` map from every media node's `video_versions`
+2. Shows a fixed **⬇ Download video** button (top-right) whenever the current `/reels/<code>/` (or `/reel/`, `/p/`, `/tv/`) URL has a known video
+3. Fetches that MP4 and saves it as `instagram-<code>.mp4`, with a live progress percentage
+
+**Quality** is the top `video_versions` entry (Instagram lists highest first). The button tracks the active reel as you scroll, since Instagram updates the URL per reel.
 
 ---
 
@@ -188,6 +202,8 @@ kinescope-video-downloader/
 ├── content-script.js      # Injected into every tab: scans for Kinescope iframes
 ├── telegram.js            # MAIN-world script for web.telegram.org: download button + chunked fetch
 ├── test_telegram.js       # Test: verifies the chunked range-assembly loop
+├── instagram.js           # MAIN-world script for instagram.com: harvests MP4 URLs from page JSON + download button
+├── test_instagram.js      # Test: verifies JSON walking and shortcode extraction
 ├── popup/
 │   ├── popup.html         # Extension popup markup
 │   ├── popup.js           # Popup logic: renders videos, handles user interactions
@@ -216,11 +232,12 @@ kinescope-video-downloader/
 
 ## Limitations
 
-- **Two platforms only.** The popup targets `kinescope.io` embeds; the download button targets `web.telegram.org` (WebK, the `/k/` client). Other platforms are not supported.
+- **Three platforms only.** The popup targets `kinescope.io` embeds; the download button targets `web.telegram.org` (WebK, the `/k/` client) and `www.instagram.com`. Other platforms are not supported.
 - **No DRM.** Videos protected with DRM cannot be downloaded.
 - **Kinescope: requires page access.** The content script runs when you open the popup; if the embed is inside a deeply nested cross-origin frame, detection may not work. The popup only works on Kinescope pages — opening it elsewhere shows a harmless "Receiving end does not exist" error.
 - **Kinescope: HLS streams only.** The extension extracts HLS (`.m3u8`) URLs. `yt-dlp` handles reassembly into a standard video file.
 - **Telegram: quality is whatever the player has selected**, and the whole file is buffered in memory before saving (heavy for multi-GB videos).
+- **Instagram: video only,** from page JSON. Reels and video posts work; the button only appears once that reel's data has loaded. Whole file is buffered in memory (fine for short reels). If a CDN URL ever blocks cross-origin fetch, the fix is to route it through the service worker's `chrome.downloads`.
 
 ---
 
