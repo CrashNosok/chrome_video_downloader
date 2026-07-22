@@ -1,3 +1,5 @@
+const NATIVE_HOST = 'com.kinescope.downloader';
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === 'getVideoData') {
     fetchVideoData(message.embedUrl).then(sendResponse);
@@ -9,6 +11,44 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ ok: true });
     return true;
   }
+});
+
+// Player download buttons (kinescope-player.js) open a long-lived port. We fetch
+// a fresh signed master.m3u8, hand it to the native host (yt-dlp), and relay the
+// host's progress/done/error messages straight back to the content script.
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'kn-download') return;
+
+  port.onMessage.addListener(({ masterUrl, title, mode }) => {
+    if (!masterUrl) {
+      port.postMessage({ type: 'error', msg: 'master.m3u8 not provided' });
+      return;
+    }
+
+    let host;
+    try {
+      host = chrome.runtime.connectNative(NATIVE_HOST);
+    } catch (e) {
+      port.postMessage({ type: 'error', msg: `native host unavailable: ${e.message}` });
+      return;
+    }
+
+    host.onMessage.addListener((msg) => port.postMessage(msg));
+    host.onDisconnect.addListener(() => {
+      const err = chrome.runtime.lastError;
+      if (err) port.postMessage({ type: 'error', msg: err.message });
+      port.disconnect(); // host finished/died → close the content port (its guard finalizes the button)
+    });
+    // If the content script goes away (tab closed), stop the host too.
+    port.onDisconnect.addListener(() => host.disconnect());
+
+    host.postMessage({
+      url: masterUrl,
+      mode,
+      title: title || 'kinescope-video',
+      referer: 'https://kinescope.io/',
+    });
+  });
 });
 
 async function fetchVideoData(embedUrl) {

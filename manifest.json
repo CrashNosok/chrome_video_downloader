@@ -5,7 +5,8 @@
   "description": "Download videos from Kinescope embeds, Telegram Web (WebK), and Instagram (reels/posts)",
   "permissions": [
     "activeTab",
-    "downloads"
+    "downloads",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "https://kinescope.io/*",
@@ -19,6 +20,12 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content-script.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://kinescope.io/embed/*"],
+      "js": ["kinescope-player.js"],
+      "all_frames": true,
       "run_at": "document_idle"
     },
     {

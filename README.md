@@ -20,6 +20,33 @@ Works on pages with multiple embeds — each video gets its own card in the popu
 
 On **Telegram Web (WebK)** and **Instagram**, it adds a separate **⬇ Download video** button while a video is open, and saves the file straight to disk.
 
+On the **Kinescope player** itself it also overlays two one-click buttons — **⬇ Видео** (mp4 with sound) and **⬇ Аудио** (m4a) — for when you don't want to touch the terminal (see below).
+
+---
+
+## Kinescope: one-click player buttons
+
+Besides the copy-command popup, the extension overlays a small toolbar on the Kinescope player with two universal buttons that download straight to `~/Downloads`:
+
+- **⬇ Видео** — best video + audio, muxed into a single `.mp4`
+- **⬇ Аудио** — audio-only `.m4a`
+
+Kinescope serves video and audio as **separate** HLS tracks (and a 1080p lecture can be ~1 GB), so muxing in the browser would be fragile and memory-heavy. Instead the button hands the fresh signed `master.m3u8` to a tiny **native-messaging host** that runs your local **`yt-dlp`** — it streams to disk, does the mux, and reports live progress back onto the button (`… 42%` → `✓ Готово`).
+
+### One-time setup
+
+Requires `yt-dlp` and `ffmpeg` on your machine (`brew install yt-dlp ffmpeg`), then register the native host:
+
+1. Load the extension (Developer Mode → **Load unpacked**), then copy its **ID** from `chrome://extensions`.
+2. Run the installer with that ID and restart Chrome:
+   ```bash
+   ./native-host/install.sh <EXTENSION_ID>
+   ```
+
+The installer writes `com.kinescope.downloader.json` into Chrome's `NativeMessagingHosts` folder (macOS) pointing at `native-host/kinescope_dl.py`. Change the download folder by editing the `DOWNLOAD_DIR` line in that script; adjust `PATH` there if your `yt-dlp`/`ffmpeg` live outside `/opt/homebrew/bin` or `/usr/local/bin`.
+
+The signed URL is re-extracted on every click, so it never goes stale. macOS only for now (the host path is Chrome-on-macOS); other OSes need their platform's `NativeMessagingHosts` location.
+
 ---
 
 ## Instagram
@@ -198,8 +225,13 @@ If the target page requires authentication, export your cookies using a browser 
 ```
 kinescope-video-downloader/
 ├── manifest.json          # Extension manifest (v3)
-├── service-worker.js      # Background: fetches embed pages, extracts playerOptions
+├── service-worker.js      # Background: fetches embed pages, extracts playerOptions, bridges the native host
 ├── content-script.js      # Injected into every tab: scans for Kinescope iframes
+├── kinescope-player.js    # Injected into the kinescope.io/embed frame: ⬇ Видео / ⬇ Аудио player buttons
+├── native-host/
+│   ├── kinescope_dl.py    # Native-messaging host: runs yt-dlp, streams progress
+│   ├── com.kinescope.downloader.json  # Host manifest template
+│   └── install.sh         # Registers the host for a given extension ID (macOS)
 ├── telegram.js            # MAIN-world script for web.telegram.org: download button + chunked fetch
 ├── test_telegram.js       # Test: verifies the chunked range-assembly loop
 ├── instagram.js           # MAIN-world script for instagram.com: harvests MP4 URLs from page JSON + download button

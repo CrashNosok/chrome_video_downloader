@@ -22,3 +22,10 @@ yarn-error.log*
 
 # Dev artifacts
 *.log
+
+# Python
+__pycache__/
+*.pyc
+
+# Playwright MCP artifacts
+.playwright-mcp/
